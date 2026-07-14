@@ -4,14 +4,14 @@ This repository hosts a production-grade pipeline for fine-tuning, merging, quan
 
 ---
 
-## 🚀 Performance Metrics & Impact
+## Performance Metrics & Impact
 * **VRAM Efficiency:** Fine-tuned a 7.3B parameter model on a single 6GB GPU (RTX 4050/4060 constraint) without Out-Of-Memory (OOM) failures.
 * **Throughput Speedup:** Achieved **39.0 tokens/second** execution speed (a **390x speedup** compared to non-accelerated/CPU-only baselines) using a optimized `Q4_K_M` quantization layout.
 * **Low Latency Deployment:** Compiled native C++ inference engine (`llama.cpp`) with full GPU layer offloading (`-ngl 99`).
 
 ---
 
-## 🛠️ System Architecture & Optimization Stack
+## System Architecture & Optimization Stack
 
 ```mermaid
 graph TD
@@ -35,7 +35,7 @@ graph TD
 
 ---
 
-## 🔧 Environment Setup & Compiling Instructions
+## Environment Setup & Compiling Instructions
 
 This setup assumes a **WSL2 (Ubuntu)** or native Linux environment.
 
@@ -75,7 +75,7 @@ cmake --build build --config Release -j$(nproc)
 
 ---
 
-## 🏃 Usage Guide
+## Usage Guide
 
 ### 1. Execute Fine-Tuning Setup
 Start by training your low-rank adapter weights. The training process uses `ds_config.json` to orchestrate offloading:
@@ -108,7 +108,7 @@ Execute the final model using the compiled CUDA-accelerated binary:
 
 ---
 
-## 📂 File Structure
+## File Structure
 * `train.py`: Fine-tuning execution script with custom callbacks and telemetry tracking.
 * `initialize_pipeline.py`: Loads the base model in 4-bit, configures LoRA adapters, and enables gradient checkpointing.
 * `export_pipeline.py`: Orchestrates GGUF base model downloading, structural merging of trained LoRA adapter, and quantization down to `Q4_K_M`.

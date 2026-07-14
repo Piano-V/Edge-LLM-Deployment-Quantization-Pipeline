@@ -21,7 +21,8 @@ optimized_mistral_weights/
 *.a
 *.so
 
-# Python caching
+# Python caching & scratch scripts
+_*.py
 __pycache__/
 *.pyc
 *.pyo

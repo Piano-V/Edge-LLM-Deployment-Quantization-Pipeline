@@ -6,13 +6,12 @@ import os
 def setup_low_memory_pipeline(model_id: str):
     print(f"Initializing boot sequence for: {model_id}")
     
-    # 1. Custom Tokenizer Setup
-    # Pulling the native tokenizer directly. No custom token additions required.
+    # Configure tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # 2. Config 4-Bit Quantization (The VRAM Savior)
+    # Configure 4-bit quantization config (NF4)
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
@@ -20,25 +19,23 @@ def setup_low_memory_pipeline(model_id: str):
         bnb_4bit_use_double_quant=True 
     )
     
-    # 3. Load Base Model with explicit memory-mapping constraints
+    # Load base model
     print("Loading base model in 4-bit NF4 precision...")
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         quantization_config=bnb_config,
         device_map="auto",
         torch_dtype=torch.bfloat16,
-        # CRITICAL FOR 16GB SYSTEM RAM: Prevent full model weight buffering in CPU memory
-        low_cpu_mem_usage=True 
+        low_cpu_mem_usage=True # Prevents full model weight buffering in system RAM
     )
     
-    # 4. Prepare model for k-bit training
+    # Prepare model for PEFT training
     model = prepare_model_for_kbit_training(
         model, 
-        use_gradient_checkpointing=True # Forces checkpointing immediately to protect VRAM during backprop
+        use_gradient_checkpointing=True # Enable gradient checkpointing to reduce VRAM usage
     )
     
-    # 5. Configure LoRA Parameters
-    # Target modules are perfectly specified for Mistral architecture.
+    # Configure LoRA
     peft_config = LoraConfig(
         r=16, 
         lora_alpha=32, 
@@ -51,30 +48,27 @@ def setup_low_memory_pipeline(model_id: str):
         task_type="CAUSAL_LM"
     )
     
-    print("Injecting low-rank adapter (LoRA) matrices...")
+    print("Injecting LoRA adapters...")
     model = get_peft_model(model, peft_config)
     
-    # Enable gradient checkpointing explicitly at the PEFT level
     model.gradient_checkpointing_enable()
     
-    # Log memory footprint metrics to verify the optimization
+    # Print trainable parameters count
     model.print_trainable_parameters()
     
     return model, tokenizer
 
 if __name__ == "__main__":
-    # Mistral-7B-v0.3 natively handles functional tokens without vocabulary expansion hacks.
     MODEL_ID = "mistralai/Mistral-7B-v0.3" 
     
-    # Environment flag to optimize CUDA memory fragmentation on small GPUs
+    # Avoid memory fragmentation on smaller GPUs
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:true"
     
-    # Execution Test
     try:
         model, tokenizer = setup_low_memory_pipeline(MODEL_ID)
-        print("\n[SUCCESS] Pipeline successfully initialized within 6GB VRAM / 16GB RAM budget.")
+        print("\nPipeline successfully initialized.")
     except RuntimeError as e:
         if "CUDA out of memory" in str(e):
-            print("\n[OOM ERROR] Caught CUDA Out of Memory during initialization. Reduce LoRA rank or target fewer modules.")
+            print("\nCaught CUDA Out of Memory during initialization.")
         else:
             raise e

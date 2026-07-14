@@ -6,7 +6,7 @@ from transformers import TrainingArguments, Trainer, TrainerCallback, DataCollat
 from datasets import load_dataset
 from initialize_pipeline import setup_low_memory_pipeline
 
-# 1. Initialize System Telemetry Trackers
+# Initialize WandB tracking
 wandb.init(
     project="systems-edge-llm", 
     name="mistral-persona-stylization-alignment",
@@ -20,10 +20,10 @@ wandb.init(
 
 MODEL_ID = "mistralai/Mistral-7B-v0.3"
 
-# 2. Boot the low-memory base structure
+# Set up model and tokenizer with QLoRA & gradient checkpointing
 model, tokenizer = setup_low_memory_pipeline(MODEL_ID)
 
-# FIX: Explicitly enforce Mistral's native [INST] structural chat template
+# Apply Mistral native chat template
 tokenizer.chat_template = (
     "{% for message in messages %}"
     "{% if message['role'] == 'user' %}"
@@ -34,18 +34,17 @@ tokenizer.chat_template = (
     "{% endfor %}"
 )
 
-# 3. Load the Pre-Formatted Stylized Dataset
-print("Loading professional persona alignment dataset...")
+# Load and format roleplay dataset
+print("Loading dataset...")
 dataset = load_dataset("hieunguyenminh/roleplay", split="train")
 
 def tokenize_and_format_function(examples):
     formatted_texts = []
     
-    # This dataset maps historical profiles cleanly with fields: 'name', 'description', 'text'
     for name, desc, raw_text in zip(examples["name"], examples["description"], examples["text"]):
         lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
         
-        # Pull up to 2 distinct back-and-forth lines for a short context sequence
+        # Parse dialogue pairs
         for i in range(0, len(lines) - 1, 2):
             user_msg = f"Adopt the persona of {name} ({desc}). How would you address a complex problem?"
             assistant_msg = lines[i+1]
@@ -61,19 +60,18 @@ def tokenize_and_format_function(examples):
     outputs = tokenizer(
         formatted_texts,
         truncation=True,
-        max_length=256  # Kept small to absolutely optimize VRAM footprint
+        max_length=256  # Keep sequences short to save VRAM
     )
     outputs["labels"] = outputs["input_ids"].copy()
     return outputs
 
-# Select a clean sample array and map
 tokenized_dataset = dataset.map(
     tokenize_and_format_function,
     batched=True,
     remove_columns=dataset.column_names
 )
 
-# 4. Configure Low-Threshold DeepSpeed Arguments
+# Setup training arguments with DeepSpeed config
 training_args = TrainingArguments(
     output_dir="./optimized_mistral_weights",
     per_device_train_batch_size=1,       
@@ -91,8 +89,8 @@ training_args = TrainingArguments(
     dataloader_pin_memory=False          
 )
 
-# 5. Advanced Thermal Management Subsystem
-class AggressiveThermalStabilizer(TrainerCallback):
+# Custom callback to prevent GPU overheating (for limited cooling environments)
+class ThermalStabilizer(TrainerCallback):
     def __init__(self, mandatory_cooldown=2.0):
         self.cooldown = mandatory_cooldown
 
@@ -101,9 +99,9 @@ class AggressiveThermalStabilizer(TrainerCallback):
         torch.cuda.empty_cache()
         time.sleep(self.cooldown)
 
-thermal_callback = AggressiveThermalStabilizer(mandatory_cooldown=2.0)
+thermal_callback = ThermalStabilizer(mandatory_cooldown=2.0)
 
-# 6. Initialize Server Trainer Instance with Dynamic Data Collator
+# Initialize Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -117,11 +115,11 @@ trainer = Trainer(
     callbacks=[thermal_callback] 
 )
 
-# 7. Run Training Matrix Optimization
-print("[SYSTEM] Launching 15-step stylization alignment sequence...")
+# Run training loop
+print("Starting training loop...")
 trainer.train()
 
-print("[SYSTEM] Exporting final structural adapter matrices to root target...")
+print("Saving fine-tuned adapter weights...")
 trainer.save_model("./optimized_mistral_weights") 
 
-print("[SUCCESS] Fine-tuning complete. Model specialized.")
+print("Fine-tuning complete.")
