@@ -23,14 +23,10 @@ MODEL_ID = "mistralai/Mistral-7B-v0.3"
 # Set up model and tokenizer with QLoRA & gradient checkpointing
 model, tokenizer = setup_low_memory_pipeline(MODEL_ID)
 
-# Apply Mistral native chat template
+# Apply ChatML chat template to match inference structure
 tokenizer.chat_template = (
     "{% for message in messages %}"
-    "{% if message['role'] == 'user' %}"
-    "{{ '[INST] ' + message['content'] + ' [/INST]' }}"
-    "{% elif message['role'] == 'assistant' %}"
-    "{{ message['content'] + eos_token }}"
-    "{% endif %}"
+    "{{ '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
     "{% endfor %}"
 )
 

@@ -16,13 +16,23 @@ This repository hosts a production-grade pipeline for fine-tuning, merging, quan
 
 ```mermaid
 graph TD
-    A[HuggingFace Mistral-7B Base] --> B[BitsAndBytes 4-bit NF4 Quantization]
-    B --> C[LoRA Low-Rank Adapter Injection]
-    C --> D[DeepSpeed Stage 2 + CPU Offload]
-    D --> E[LoRA Adapter Weights .gguf]
-    E --> F[llama-export-lora: Precision Merge]
-    F --> G[llama-quantize: Q4_K_M Compression]
-    G --> H[llama-cli CUDA Engine Deployment]
+    subgraph FineTuning ["1. Fine-Tuning Phase (train.py)"]
+        A[HuggingFace Mistral-7B Base] --> B[BitsAndBytes 4-bit NF4 Quantization]
+        B --> C[LoRA Low-Rank Adapter Injection]
+        C --> D[DeepSpeed Stage 2 + CPU Offload]
+        D --> E[HF LoRA Adapter Weights <br> adapter_model.safetensors]
+    end
+
+    subgraph ExportQuant ["2. Export & Quantization Phase (export_pipeline.py)"]
+        E --> F[convert_lora_to_gguf.py]
+        F --> G[LoRA Adapter Weights .gguf]
+        G --> H[llama-export-lora: Precision Merge]
+        H --> I[llama-quantize: Q4_K_M Compression]
+    end
+
+    subgraph Inference ["3. Local Inference"]
+        I --> J[llama-cli CUDA Engine Deployment]
+    end
 ```
 
 ### 1. Fine-Tuning Optimizations (`initialize_pipeline.py`)
@@ -103,8 +113,10 @@ Execute the final model using the compiled CUDA-accelerated binary:
 ./llama.cpp/build/bin/llama-cli \
   -m ./mistral_persona_perfect_q4.gguf \
   -ngl 99 \
-  --temp 0.7 \
-  -p "[INST] Adopt the persona of a senior systems engineer. How do you solve memory fragmentation? [/INST]"
+  -r "<|im_end|>" \
+  --no-conversation \
+  -p "<|im_start|>system\nIn the bustling streets of Victorian London, there exists a figure of unparalleled intellect and deductive prowess - Sherlock Holmes...<|im_end|>\n<|im_start|>user\nHow would you analyze a missing wallet?<|im_end|>\n<|im_start|>assistant\n" \
+  -n 256
 ```
 
 ---

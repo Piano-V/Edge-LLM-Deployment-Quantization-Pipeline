@@ -53,10 +53,22 @@ def build_automated_llamacpp_pipeline():
     else:
         print(f"Found base model: {BASE_MODEL_F16}")
 
-    # Ensure trained adapter is present
+    # Ensure trained adapter is present; automatically convert HF weights if GGUF is missing
     if not os.path.exists(ADAPTER_GGUF):
-        print(f"[ERROR] Missing adapter weights at: {ADAPTER_GGUF}")
-        sys.exit(1)
+        hf_adapter_weights = os.path.join(ADAPTER_DIR, "adapter_model.safetensors")
+        if os.path.exists(hf_adapter_weights):
+            print(f"\n[INFO] GGUF adapter not found, but HF PEFT weights found at {hf_adapter_weights}.")
+            print("Converting HF PEFT adapter to GGUF format...\n")
+            convert_cmd = [
+                sys.executable,
+                "./llama.cpp/convert_lora_to_gguf.py",
+                ADAPTER_DIR,
+                "--outfile", ADAPTER_GGUF
+            ]
+            run_command(convert_cmd, "Converting HF LoRA adapter to GGUF")
+        else:
+            print(f"[ERROR] Missing adapter weights at: {ADAPTER_GGUF} and no HF adapter found at {hf_adapter_weights}")
+            sys.exit(1)
 
     # Merge LoRA weights into base model
     if not os.path.exists(MERGED_F16):
@@ -85,7 +97,7 @@ def build_automated_llamacpp_pipeline():
     print(f"- Merged model: {MERGED_F16}")
     print(f"- Quantized model: {FINAL_QUANT_Q4}")
     print("\nRun deployment using:")
-    print(f"{os.path.join(LLAMA_BIN_DIR, 'llama-cli')} -m {FINAL_QUANT_Q4} -ngl 99 --temp 0.7 -p \"...\"")
+    print(f"{os.path.join(LLAMA_BIN_DIR, 'llama-cli')} -m {FINAL_QUANT_Q4} -ngl 99 -r \"<|im_end|>\" --no-conversation -p \"<|im_start|>system\\nIn the bustling streets of Victorian London, there exists a figure of unparalleled intellect and deductive prowess - Sherlock Holmes...<|im_end|>\\n<|im_start|>user\\nHow would you analyze a missing wallet?<|im_end|>\\n<|im_start|>assistant\\n\" -n 256")
 
 if __name__ == "__main__":
     build_automated_llamacpp_pipeline()
