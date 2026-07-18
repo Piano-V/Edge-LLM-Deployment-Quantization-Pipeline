@@ -5,7 +5,7 @@ This repository hosts a production-grade pipeline for fine-tuning, merging, quan
 ---
 
 ## Performance Metrics & Impact
-* **VRAM Efficiency:** Fine-tuned a 7.3B parameter model on a single 6GB GPU (RTX 4050/4060 constraint) without Out-Of-Memory (OOM) failures.
+* **VRAM Efficiency:** Fine-tuned a 7.3B parameter model on a single 6GB GPU (RTX 4050 constraint) without Out-Of-Memory (OOM) failures.
 * **Throughput Speedup:** Achieved **39.0 tokens/second** execution speed (a **390x speedup** compared to non-accelerated/CPU-only baselines) using a optimized `Q4_K_M` quantization layout.
 * **Low Latency Deployment:** Compiled native C++ inference engine (`llama.cpp`) with full GPU layer offloading (`-ngl 99`).
 * **Real-time Telemetry:** Training metrics, loss convergence, and resource consumption plots are publicly tracked on [Weights & Biases](https://api.wandb.ai/links/xabhiz-personal/174idjqk).
